@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="page-title">Linden grüßt Linden</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      scroll-behavior: smooth;
+    }
+    body {
+      font-family: 'Nunito', sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+      background-color: #f0f2f5;
+      color: #333;
+    }
+    header {
+      background: linear-gradient(135deg, #2e8b57, #3cb371);
+      color: white;
+      padding: 30px 15px 20px;
+      text-align: center;
+      position: relative;
+    }
+    header img {
+      height: 80px;
+      margin-bottom: 10px;
+    }
+    nav {
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 30px;
+      padding: 15px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      flex-wrap: wrap;
+    }
+    nav a {
+      color: #2e8b57;
+      font-weight: bold;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+    }
+    nav a:hover {
+      background-color: #2e8b57;
+      color: white;
+    }
+    nav select {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1em;
+      background-color: white;
+      color: #333;
+    }
+    section {
+      max-width: 900px;
+      margin: 40px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transition: transform 0.3s ease;
+    }
+    section:hover {
+      transform: translateY(-4px);
+    }
+    footer {
+      text-align: center;
+      padding: 20px;
+      background: #2e8b57;
+      color: white;
+    }
+    a {
+      color: #2e8b57;
+    }
+    .video-preview {
+      text-align: center;
+    }
+    .video-preview img {
+      width: 100%;
+      max-width: 600px;
+      border-radius: 10px;
+      margin-top: 10px;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+    }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      padding: 20px;
+      justify-items: center;
+    }
+    .gallery-grid img {
+      width: 100%;
+      max-width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    }
+    .gallery-grid img.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #map {
+      height: 500px;
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 10px;
+    }
+  </style>
+  <script src="translations.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const userLang = (navigator.language || navigator.userLanguage).substring(0, 2);
+      const langSelect = document.getElementById("language");
+      const defaultLang = translations[userLang] ? userLang : "de";
+      langSelect.value = defaultLang;
+      changeLanguage(defaultLang);
+
+      langSelect.addEventListener("change", (e) => {
+        changeLanguage(e.target.value);
+      });
+
+      function changeLanguage(lang) {
+        const nav = translations[lang];
+
+        document.title = nav.pageTitle;
+        document.getElementById("page-title").textContent = nav.pageTitle;
+        document.getElementById("main-heading").textContent = nav.headerTitle;
+        document.getElementById("main-subheading").textContent = nav.headerSubtitle;
+
+        document.getElementById("nav-ueber").textContent = nav.ueber;
+        document.getElementById("nav-teilnahme").textContent = nav.teilnahme;
+        document.getElementById("nav-kontakt").textContent = nav.kontakt;
+
+        document.getElementById("heading-ueber").textContent = nav.sectionTitles.ueber;
+        document.getElementById("heading-teilnahme").textContent = nav.sectionTitles.teilnahme;
+        document.getElementById("heading-kontakt").textContent = nav.sectionTitles.kontakt;
+
+        document.getElementById("section-ueber").textContent = nav.sections.ueber;
+        document.getElementById("section-teilnahme").textContent = nav.sections.teilnahme;
+        document.getElementById("section-kontakt").textContent = nav.sections.kontakt;
+
+        langSelect.innerHTML = "";
+        for (const code in translations) {
+          const option = document.createElement("option");
+          option.value = code;
+          option.textContent = translations[code].language;
+          if (code === lang) option.selected = true;
+          langSelect.appendChild(option);
+        }
+      }
+
+      // Gallerie laden
+      fetch('/api/images')
+        .then(res => res.json())
+        .then(images => {
+          const gallery = document.getElementById('gallery-grid');
+          images.forEach(file => {
+            const img = document.createElement('img');
+            img.src = `fotos/${file}`;
+            img.alt = file;
+            img.loading = 'lazy';
+            img.onload = () => img.classList.add('visible');
+            gallery.appendChild(img);
+          });
+        });
+
+      // Karte anzeigen
+      const map = L.map('map').setView([50, 10], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      const partnerLocations = [
+        { name: 'Linden, Deutschland', flag: '🇩🇪', lat: 54.25, lon: 9.25 },
+        { name: 'Linden, Österreich', flag: '🇦🇹', lat: 48.25, lon: 14.85 },
+        { name: 'Linden, Niederlande', flag: '🇳🇱', lat: 51.77, lon: 5.87 },
+        { name: 'Linden, Belgien', flag: '🇧🇪', lat: 50.88, lon: 4.75 },
+        { name: 'Linden, Frankreich', flag: '🇫🇷', lat: 45.76, lon: 4.84 },
+        { name: 'Linden, Spanien', flag: '🇪🇸', lat: 41.38, lon: 2.17 }
+      ];
+
+      partnerLocations.forEach(place => {
+        L.marker([place.lat, place.lon])
+          .addTo(map)
+          .bindPopup(`<strong>${place.flag} ${place.name}</strong>`);
+      });
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <img src="logo-linden.svg" alt="Logo der Gemeinde Linden" />
+    <h1 id="main-heading">Linden grüßt Linden</h1>
+    <p id="main-subheading">Internationale Gemeindepartnerschaften leben</p>
+  </header>
+  <nav>
+    <a href="#ueber" id="nav-ueber">Über das Projekt</a>
+    <a href="#teilnahme" id="nav-teilnahme">Teilnahme</a>
+    <a href="#kontakt" id="nav-kontakt">Kontakt</a>
+    <select id="language"></select>
+  </nav>
+
+  <section id="ueber">
+    <h2 id="heading-ueber"></h2>
+    <p id="section-ueber"></p>
+  </section>
+
+  <section id="teilnahme">
+    <h2 id="heading-teilnahme"></h2>
+    <p id="section-teilnahme"></p>
+  </section>
+
+  <section id="kontakt">
+    <h2 id="heading-kontakt"></h2>
+    <p id="section-kontakt"></p>
+  </section>
+
+  <section id="video">
+    <h2>Europa trifft sich in Linden</h2>
+    <div class="video-preview">
+      <p>Erleben Sie die Geschichte unserer Gemeindepartnerschaften in der NDR-Reportage:</p>
+      <a href="https://www.ndr.de/geschichte/schauplaetze/Europa-trifft-sich-in-Linden-,europa1020.html" target="_blank">
+        <img src="screenshot-video.jpg" alt="Screenshot aus dem NDR-Video" />
+      </a>
+    </div>
+  </section>
+  <section id="map-section">
+    <h2>Partnergemeinden in Europa</h2>
+    <div id="map"></div>
+  </section>
+  <section id="gallery">
+    <h2>Impressionen von „Linden grüßt Linden“</h2>
+    <div class="gallery-grid" id="gallery-grid"></div>
+  </section>
+
+
+
+  <footer>
+    <p>&copy; 2025 Linden grüßt Linden – Ein Projekt der Gemeinde Linden (25791)</p>
+  </footer>
+</body>
+</html>
